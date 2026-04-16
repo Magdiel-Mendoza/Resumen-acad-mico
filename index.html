@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Planilla">
-<link rel="manifest" href="data:application/json,{%22name%22:%22Planilla%20Acad%C3%A9mica%22,%22short_name%22:%22Planilla%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%230F6E56%22,%22theme_color%22:%22%230F6E56%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230F6E56'/%3E%3Ctext y='.9em' font-size='80' x='10'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22any%22,%22type%22:%22image/svg+xml%22}]}">
+<link rel="manifest" href="manifest.json">
 <title>Planilla Académica</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -37,8 +37,11 @@
   --re:#152e24;--rh:#1e4a38;--ov:rgba(0,0,0,0.7);
   --ph:#0d2a18;--phc:#97C459;--pm:#0d1a2a;--pmc:#85B7EB;--pl:#2a0d0d;--plc:#F09595;
 }
-html{font-size:14px}
+html{font-size:15px}
 body{font-family:var(--fn);color:var(--tx);background:var(--bg);min-height:100vh;transition:background .2s,color .2s}
+body.fs-sm{font-size:13px}body.fs-md{font-size:15px}body.fs-lg{font-size:17px}body.fs-xl{font-size:19px}
+body.fw-bold td, body.fw-bold .ni, body.fw-bold .nin, body.fw-bold th{font-weight:700!important}
+body.fw-bold .ok, body.fw-bold .bad, body.fw-bold .auto-n{font-weight:900!important}
 .app{max-width:1400px;margin:0 auto;padding:12px}
 
 /* HDR */
@@ -123,8 +126,10 @@ td.tl{text-align:left}
 .nim{width:130px}
 .nc-v{color:var(--tx3);font-style:italic;font-size:10px}
 .iv{color:var(--Rm);font-weight:700}
-.ok{color:var(--G);font-weight:500}
+.ok{color:var(--G);font-weight:700}
 .bad{color:var(--R);font-weight:700}
+[data-theme=dark] td .ok{color:#7FFFD0}
+[data-theme=dark] td .bad{color:#FF8080}
 .ro-note{font-size:11.5px;font-weight:600}
 .auto-n{color:var(--B);font-weight:600;font-size:11px}
 .ph2{background:var(--ph)!important;color:var(--phc)!important;font-weight:700}
@@ -259,6 +264,11 @@ td.tl{text-align:left}
     <div><div class="hi" id="d-inst">UEN LB Dr. Siso Martínez</div><div class="hs" id="d-lugar">Barquisimeto, Estado Lara</div></div>
     <div class="hdr-r">
       <div class="hbadge" id="d-badge">4to "B" · 2012–2013</div>
+      <div style="display:flex;gap:3px;align-items:center">
+        <button class="tbtn" onclick="setFS('sm')" title="Fuente pequeña" style="padding:3px 7px">A-</button>
+        <button class="tbtn" onclick="setFS('lg')" title="Fuente grande" style="padding:3px 7px">A+</button>
+        <button class="tbtn" id="bold-btn" onclick="toggleBold()" title="Negrita">B</button>
+      </div>
       <button class="tbtn" onclick="toggleTheme()" id="tbtnEl">🌙 Oscuro</button>
     </div>
   </div>
@@ -278,7 +288,7 @@ td.tl{text-align:left}
   <button class="tab" onclick="showTab('t3',this)">3er Lapso</button>
   <button class="tab" onclick="showTab('tf',this)">Nota Final</button>
   <button class="tab" onclick="showTab('tal',this)">Por Alumno</button>
-  <button class="tab" onclick="showTab('tmat',this)" style="border-color:#854F0B;color:#854F0B" title="Modo para docente que solo dicta una materia">📘 Mi Materia</button>
+  <button class="tab" onclick="showTab('tmat',this)" title="Modo para docente que solo dicta una materia">📘 Mi Materia</button>
 </div>
 <div class="pcard">
   <div id="t1" class="panel act"></div>
@@ -408,6 +418,31 @@ function updH(){
   document.getElementById('d-inst').textContent=v;
   document.getElementById('d-lugar').textContent=l;
   document.getElementById('d-badge').textContent=document.getElementById('f-sec').value+' · '+document.getElementById('f-per').value;
+}
+
+// ===== FONT SIZE & BOLD =====
+let fsLevel='md', boldOn=false;
+const fsSizes=['sm','md','lg','xl'];
+function setFS(dir){
+  let idx=fsSizes.indexOf(fsLevel);
+  if(dir==='sm')idx=Math.max(0,idx-1);
+  else idx=Math.min(fsSizes.length-1,idx+1);
+  fsLevel=fsSizes[idx];
+  document.body.className=document.body.className.replace(/fs-\w+/g,'').trim();
+  document.body.classList.add('fs-'+fsLevel);
+  localStorage.setItem('pal_fs',fsLevel);
+}
+function toggleBold(){
+  boldOn=!boldOn;
+  document.body.classList.toggle('fw-bold',boldOn);
+  const btn=document.getElementById('bold-btn');
+  if(btn){btn.style.fontWeight=boldOn?'900':'400';btn.style.textDecoration=boldOn?'underline':'';}
+  localStorage.setItem('pal_bold',boldOn?'1':'0');
+}
+function loadFontPrefs(){
+  const fs=localStorage.getItem('pal_fs')||'md';
+  fsLevel=fs;document.body.classList.add('fs-'+fs);
+  if(localStorage.getItem('pal_bold')==='1'){boldOn=true;document.body.classList.add('fw-bold');}
 }
 
 // ===== THEME =====
@@ -669,98 +704,145 @@ function delMat(i){
 }
 function renameMat(i,v){mats[i]=v;}
 
-// ===== MI MATERIA (single subject, non-guide teacher) =====
-let myMat={
-  name:'Matemática',
-  section:'4to "B"',
-  rows:NAMES.map(n=>({nom:n,l1:null,l2:null,l3:null}))
-};
+// ===== MI MATERIA — múltiples secciones =====
+let secciones=[
+  {id:1, mat:'Matemática', sec:'1er A', period:'2024-2025',
+   rows:NAMES.slice(0,15).map(n=>({nom:n,l1:null,l2:null,l3:null}))}
+];
+let secActiva=0; // índice de sección activa en Mi Materia
+
+function autoF3(l1,l2,l3){
+  const vals=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number).filter(v=>!isNaN(v));
+  if(!vals.length)return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+
+function normV(v){
+  if(v===null||v===undefined||v==='')return null;
+  const s=String(v).trim().toLowerCase();
+  if(s==='nc')return'NC';if(s==='i')return'I';
+  const n=parseFloat(s);return isNaN(n)?null:Math.min(20,Math.max(0,n));
+}
+
+function mCell(v,ri,lapso){
+  let disp='<span style="color:var(--brd2)">—</span>';
+  if(v!==null){
+    if(isNC(v))disp='<span class="nc-v">NC</span>';
+    else if(isI(v))disp='<span class="iv">i</span>';
+    else{const n=parseFloat(v);if(!isNaN(n))disp=`<span class="${n>=10?'ok':'bad'}">${dn(n)}</span>`;}
+  }
+  return`<td class="ni-cell" onclick="focusNi(this)"><span class="ni-disp">${disp}</span><input class="ni ni-hide" value="${v!==null?String(v):''}" onchange="setMatN(${ri},'${lapso}',this.value)" onblur="blurNi(this)" inputmode="decimal"></td>`;
+}
 
 function renderMiMateria(){
-  const rows=myMat.rows;
-  const autoF3=(l1,l2,l3)=>{
-    const vals=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number).filter(v=>!isNaN(v));
-    if(!vals.length)return null;
-    return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-  };
+  const sec=secciones[secActiva];
+  const rows=sec.rows;
   let tbody='',sum=0,cnt=0,nAll=0,nApl=0;
   rows.forEach((r,ri)=>{
-    const vals=[r.l1,r.l2,r.l3].map(v=>{
-      if(v===null)return null;
-      if(isNC(v))return'NC';if(isI(v))return'I';
-      const n=parseFloat(v);return isNaN(n)?null:Math.min(20,Math.max(0,n));
-    });
-    const fin=autoF3(vals[0],vals[1],vals[2]);
-    const numVals=vals.filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number);
-    const prom=numVals.length?numVals.reduce((a,b)=>a+b,0)/numVals.length:null;
-    if(prom!==null){sum+=prom;cnt++;}
-    const finOk=fin!==null&&!isNC(fin)&&!isI(fin)&&parseFloat(fin)>=10;
-    const finBad=fin!==null&&!isNC(fin)&&!isI(fin)&&parseFloat(fin)<10;
-    if(finOk)nAll++;else if(finBad)nApl++;
-
-    const mCell=(v,key)=>{
-      let disp='<span style="color:var(--brd2)">—</span>',cls='';
-      if(v!==null){
-        if(isNC(v)){disp='<span class="nc-v">NC</span>';}
-        else if(isI(v)){disp='<span class="iv">i</span>';}
-        else{const n=parseFloat(v);if(!isNaN(n))disp=`<span class="${n>=10?'ok':'bad'}">${dn(n)}</span>`;}
-      }
-      return`<td class="ni-cell" onclick="focusNi(this)"><span class="ni-disp">${disp}</span><input class="ni ni-hide" value="${v!==null?String(v):''}" onchange="setMat(${ri},'${key}',this.value)" onblur="blurNi(this)" inputmode="decimal"></td>`;
-    };
+    const l1=normV(r.l1),l2=normV(r.l2),l3=normV(r.l3);
+    const fin=autoF3(l1,l2,l3);
+    const numVals=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number);
+    if(numVals.length){sum+=numVals.reduce((a,b)=>a+b,0)/numVals.length;cnt++;}
+    if(fin!==null&&!isNC(fin)&&!isI(fin)){if(parseFloat(fin)>=10)nAll++;else nApl++;}
     const finDisp=fin===null?'<span style="color:var(--brd2)">—</span>':isNC(fin)?'<span class="nc-v">NC</span>':isI(fin)?'<span class="iv">i</span>':`<span class="${parseFloat(fin)>=10?'ok':'bad'}">${dn(fin)}</span>`;
     tbody+=`<tr><td style="color:var(--tx3);font-size:9.5px">${ri+1}</td>
-      <td class="tl"><input class="ni nin" value="${r.nom}" onchange="myMat.rows[${ri}].nom=this.value" inputmode="text"></td>
-      ${mCell(r.l1,'l1')}${mCell(r.l2,'l2')}${mCell(r.l3,'l3')}
-      <td style="font-weight:700">${finDisp}</td>
-      <td><button class="dbtn" onclick="delMatRow(${ri})" title="Eliminar">−</button></td></tr>`;
+      <td class="tl"><input class="ni nin" value="${r.nom}" onchange="secciones[secActiva].rows[${ri}].nom=this.value" inputmode="text"></td>
+      ${mCell(l1,ri,'l1')}${mCell(l2,ri,'l2')}${mCell(l3,ri,'l3')}
+      <td style="font-weight:700;text-align:center">${finDisp}</td>
+      <td><button class="dbtn" onclick="delMatRow(${ri})">−</button></td></tr>`;
   });
   const avg=cnt?sum/cnt:0;
-  return`<div style="background:var(--Al);border-radius:var(--r);padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--A);border-left:3px solid var(--Am)">
-    <b>📘 Modo: Docente no guía</b> — Solo una asignatura. La nota final se calcula como promedio redondeado de los 3 lapsos.
-  </div>
-  <div class="sts">
-    <div class="sc st"><div class="sl">Promedio grupo</div><div class="sv">${avg.toFixed(2)}</div><div class="ss">${rows.length} estudiantes</div></div>
-    <div class="sc sg"><div class="sl">Aprobados</div><div class="sv">${nAll}</div><div class="ss">nota final ≥ 10</div></div>
-    <div class="sc sa"><div class="sl">Aplazados</div><div class="sv">${nApl}</div><div class="ss">nota final &lt; 10</div></div>
+
+  // Selector de secciones
+  const secOpts=secciones.map((s,i)=>`<option value="${i}" ${i===secActiva?'selected':''}>${s.mat} – ${s.sec}</option>`).join('');
+
+  return`<div style="background:var(--Tl);border-radius:var(--r);padding:9px 13px;margin-bottom:10px;border-left:3px solid var(--Tm)">
+    <b style="color:var(--Td)">📘 Docente no guía</b> <span style="font-size:11px;color:var(--tx2)">— Maneja varias secciones/materias de forma independiente.</span>
   </div>
   <div class="tb">
-    <button class="btn bt" onclick="addMatRow()">+ Alumno</button>
-    <button class="btn bg" onclick="printMiMateria()">🖨 Imprimir planilla</button>
+    <select id="sec-sel" onchange="secActiva=parseInt(this.value);refreshPanel('tmat')"
+      style="font-size:12px;padding:5px 9px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn);max-width:220px">
+      ${secOpts}
+    </select>
+    <button class="btn bt" onclick="nuevaSeccion()" title="Agregar nueva sección/materia">+ Sección</button>
+    <button class="btn br" onclick="eliminarSeccion()" title="Eliminar sección activa">✕ Sección</button>
     <span class="sp"></span>
+    <button class="btn bt" onclick="addMatRow()">+ Alumno</button>
+    <button class="btn bg" onclick="printMiMateria()">🖨 Imprimir</button>
     <button class="btn bs" onclick="openDat()">💾 Datos</button>
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap;align-items:center">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <label style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em">Nombre de la asignatura</label>
-      <input class="ni nim" style="width:200px" value="${myMat.name}" onchange="myMat.name=this.value;refreshPanel('tmat')" inputmode="text">
+  <div class="sts">
+    <div class="sc st"><div class="sl">Promedio</div><div class="sv">${avg.toFixed(2)}</div><div class="ss">${rows.length} alumnos</div></div>
+    <div class="sc sg"><div class="sl">Aprobados</div><div class="sv">${nAll}</div></div>
+    <div class="sc sa"><div class="sl">Aplazados</div><div class="sv">${nApl}</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap;align-items:flex-end">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em">Asignatura</label>
+      <input class="ni nim" style="width:180px;font-size:12px;padding:5px 8px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx)"
+        value="${sec.mat}" onchange="secciones[secActiva].mat=this.value;updateSecSel()" inputmode="text">
     </div>
-    <div style="display:flex;flex-direction:column;gap:2px">
+    <div style="display:flex;flex-direction:column;gap:3px">
       <label style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em">Sección</label>
-      <input class="ni" style="width:120px" value="${myMat.section}" onchange="myMat.section=this.value" inputmode="text">
+      <input class="ni" style="width:110px;font-size:12px;padding:5px 8px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx)"
+        value="${sec.sec}" onchange="secciones[secActiva].sec=this.value;updateSecSel()" inputmode="text">
     </div>
-    <input placeholder="Buscar estudiante…" style="flex:1;font-size:12px;padding:5px 10px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn);min-width:120px" oninput="filterMatRows(this.value)" inputmode="text">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em">Período</label>
+      <input class="ni" style="width:120px;font-size:12px;padding:5px 8px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx)"
+        value="${sec.period}" onchange="secciones[secActiva].period=this.value" inputmode="text">
+    </div>
+    <input placeholder="Buscar alumno…" id="mat-search"
+      style="flex:1;font-size:12px;padding:5px 10px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn);min-width:120px"
+      oninput="filterMatRows(this.value)" inputmode="text">
   </div>
   <div class="tw"><table id="mat-table">
     <thead><tr>
       <th>#</th><th class="tl" style="min-width:140px">Apellidos y nombres</th>
       <th>1er Lapso</th><th>2do Lapso</th><th>3er Lapso</th>
-      <th style="background:#333">Nota Final</th><th></th>
+      <th>Nota Final</th><th></th>
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table></div>
-  <div class="nb">Nota final = promedio redondeado de los 3 lapsos &nbsp;·&nbsp; Notas &lt;10 en rojo &nbsp;·&nbsp; Haz clic en una nota para editarla</div>`;
+  <div class="nb">Nota final = promedio redondeado · Notas &lt;10 en rojo · Clic sobre nota para editar</div>`;
 }
 
-function setMat(ri,key,val){myMat.rows[ri][key]=norm(val);refreshPanel('tmat');}
-function addMatRow(){myMat.rows.push({nom:'Apellido, Nombre',l1:null,l2:null,l3:null});refreshPanel('tmat');}
+function updateSecSel(){
+  const sel=document.getElementById('sec-sel');
+  if(!sel)return;
+  sel.innerHTML=secciones.map((s,i)=>`<option value="${i}" ${i===secActiva?'selected':''}>${s.mat} – ${s.sec}</option>`).join('');
+}
+
+function nuevaSeccion(){
+  const nombre=prompt('Nombre de la asignatura (ej: Matemática):','Matemática');
+  if(!nombre)return;
+  const secNom=prompt('Sección (ej: 1er A):','1er A');
+  if(!secNom)return;
+  secciones.push({id:Date.now(),mat:nombre.trim(),sec:secNom.trim(),period:'2024-2025',rows:[]});
+  secActiva=secciones.length-1;
+  refreshPanel('tmat');showToast('✓ Sección creada: '+nombre+' – '+secNom);
+}
+
+function eliminarSeccion(){
+  if(secciones.length<=1){showToast('Debe existir al menos una sección.');return;}
+  const s=secciones[secActiva];
+  if(!confirm('¿Eliminar la sección "'+s.mat+' – '+s.sec+'"?'))return;
+  secciones.splice(secActiva,1);
+  secActiva=Math.max(0,secActiva-1);
+  refreshPanel('tmat');showToast('Sección eliminada.');
+}
+
+function setMatN(ri,lapso,val){
+  secciones[secActiva].rows[ri][lapso]=normV(val);refreshPanel('tmat');
+}
+function addMatRow(){secciones[secActiva].rows.push({nom:'Apellido, Nombre',l1:null,l2:null,l3:null});refreshPanel('tmat');}
 function delMatRow(ri){
-  if(myMat.rows.length<=1)return;
-  if(!confirm('¿Eliminar a "'+myMat.rows[ri].nom+'"?'))return;
-  myMat.rows.splice(ri,1);refreshPanel('tmat');
+  if(secciones[secActiva].rows.length<=1)return;
+  if(!confirm('¿Eliminar a "'+secciones[secActiva].rows[ri].nom+'"?'))return;
+  secciones[secActiva].rows.splice(ri,1);refreshPanel('tmat');
 }
 function filterMatRows(q){
-  const rows=document.querySelectorAll('#mat-table tbody tr');
-  rows.forEach(tr=>{
+  document.querySelectorAll('#mat-table tbody tr').forEach(tr=>{
     const inp=tr.querySelector('td.tl input');
     if(!inp){tr.style.display='';return;}
     tr.style.display=inp.value.toLowerCase().includes(q.toLowerCase())?'':'none';
@@ -768,54 +850,46 @@ function filterMatRows(q){
 }
 
 function printMiMateria(){
-  const i=inf();
-  const rows=myMat.rows;
-  const autoF3=(l1,l2,l3)=>{
-    const vals=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number).filter(v=>!isNaN(v));
-    if(!vals.length)return null;
-    return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-  };
+  const i=inf(), sec=secciones[secActiva], rows=sec.rows;
   let tbody='',nAll=0,nApl=0,sumP=0,cntP=0;
   rows.forEach((r,ri)=>{
-    const vals=[r.l1,r.l2,r.l3].map(v=>{
-      if(v===null)return null;
-      if(isNC(v))return'NC';if(isI(v))return'I';
-      const n=parseFloat(v);return isNaN(n)?null:Math.min(20,Math.max(0,n));
-    });
-    const fin=autoF3(vals[0],vals[1],vals[2]);
-    const numVals=vals.filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number);
-    if(numVals.length){sumP+=numVals.reduce((a,b)=>a+b,0)/numVals.length;cntP++;}
-    const finN=fin!==null&&!isNC(fin)&&!isI(fin)?parseFloat(fin):null;
-    if(finN!==null){if(finN>=10)nAll++;else nApl++;}
-    const dCell=v=>{if(v===null)return'—';if(isNC(v))return'NC';if(isI(v))return'i';const n=parseFloat(v);return isNaN(n)?String(v):dn(n);};
-    const fCls=v=>{if(v===null||isNC(v)||isI(v))return'';const n=parseFloat(v);return isNaN(n)||n>=10?'bok':'bbd';};
-    const finD=fin!==null?dCell(fin):'—';
+    const l1=normV(r.l1),l2=normV(r.l2),l3=normV(r.l3);
+    const fin=autoF3(l1,l2,l3);
+    const nums=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number);
+    if(nums.length){sumP+=nums.reduce((a,b)=>a+b,0)/nums.length;cntP++;}
+    if(fin!==null&&!isNC(fin)&&!isI(fin)){if(parseFloat(fin)>=10)nAll++;else nApl++;}
+    const dc=v=>{if(v===null)return'—';if(isNC(v))return'NC';if(isI(v))return'i';const n=parseFloat(v);return isNaN(n)?String(v):dn(n);};
+    const fc=v=>{if(!v||isNC(v)||isI(v))return'';const n=parseFloat(v);return isNaN(n)||n>=10?'bok':'bbd';};
     tbody+=`<tr><td class="tl">${ri+1}. ${r.nom}</td>
-      <td class="${fCls(r.l1)}">${dCell(r.l1)}</td><td class="${fCls(r.l2)}">${dCell(r.l2)}</td><td class="${fCls(r.l3)}">${dCell(r.l3)}</td>
-      <td class="${fCls(fin)}" style="font-weight:700;background:#eee">${finD}</td></tr>`;
+      <td class="${fc(l1)}">${dc(l1)}</td><td class="${fc(l2)}">${dc(l2)}</td><td class="${fc(l3)}">${dc(l3)}</td>
+      <td class="${fc(fin)}" style="font-weight:700;background:#f0f0f0">${dc(fin)}</td></tr>`;
   });
   const avg=cntP?sumP/cntP:0;
-  const html=`<div class="pdoc bp">
-    ${venHdr('Registro de Notas — '+myMat.name)}
+  doPrint(`<div class="pdoc bp">
+    ${venHdr('Registro de Notas — '+sec.mat)}
     <div class="sec-meta">
-      <span>Asignatura: <b>${myMat.name}</b></span>
-      <span>Sección: <b>${myMat.section||i.sec}</b></span>
-      <span>Período: <b>${i.periodo}</b></span>
+      <span>Asignatura: <b>${sec.mat}</b></span>
+      <span>Sección: <b>${sec.sec}</b></span>
+      <span>Período: <b>${sec.period||i.periodo}</b></span>
       <span>Docente: <b>${i.doc}</b></span>
       <span>Alumnos: <b>${rows.length}</b></span>
-      <span>Prom.: <b>${avg.toFixed(2)}</b></span>
+      <span>Promedio: <b>${avg.toFixed(2)}</b></span>
       <span>Aprobados: <b>${nAll}</b></span>
       <span>Aplazados: <b>${nApl}</b></span>
     </div>
     <table class="sec-tbl">
-      <thead><tr><th class="tl" style="min-width:130px">Apellidos y nombres</th><th>1er Lapso</th><th>2do Lapso</th><th>3er Lapso</th><th style="background:#555">Nota Final</th></tr></thead>
+      <thead><tr>
+        <th class="tl" style="min-width:130px">Apellidos y nombres</th>
+        <th>1er Lapso</th><th>2do Lapso</th><th>3er Lapso</th>
+        <th style="background:#555">Nota Final</th>
+      </tr></thead>
       <tbody>${tbody}</tbody>
     </table>
-    <div class="sec-foot"><span>Notas aplazadas subrayadas</span><span>Nota final = promedio redondeado</span><span>Aprobado ≥ 10</span><span>Escala 0–20</span></div>
+    <div class="sec-foot"><span>Notas &lt;10 subrayadas</span><span>Nota final=promedio redondeado</span><span>Aprobado ≥10</span><span>Escala 0–20</span></div>
     <div class="sec-fir"><div>Docente: ${i.doc}</div><div>Director(a)</div><div>Fecha: ___________</div></div>
-  </div>`;
-  doPrint(html);
+  </div>`);
 }
+
 
 // ===== TAB / REFRESH =====
 function showTab(id,el){
@@ -860,10 +934,11 @@ function openDat(){
 function closeDat(){document.getElementById('dat-ov').classList.remove('open');}
 document.getElementById('dat-ov').addEventListener('click',e=>{if(e.target===document.getElementById('dat-ov'))closeDat();});
 
-function getState(){return{mats:[...mats],data:JSON.parse(JSON.stringify(data)),meta:inf()};}
+function getState(){return{mats:[...mats],data:JSON.parse(JSON.stringify(data)),secciones:JSON.parse(JSON.stringify(secciones)),meta:inf()};}
 function applyState(st){
   if(st.mats){mats.splice(0,mats.length,...st.mats);}
   if(st.data){Object.keys(st.data).forEach(k=>{data[k]=st.data[k];});}
+  if(st.secciones&&Array.isArray(st.secciones)&&st.secciones.length){secciones.splice(0,secciones.length,...st.secciones);secActiva=0;}
   if(st.meta){
     ['inst','lugar','doc','sec'].forEach(f=>{const el=document.getElementById('f-'+f);if(el&&st.meta[f])el.value=st.meta[f];});
     const ep=document.getElementById('f-per');if(ep&&st.meta.periodo)ep.value=st.meta.periodo;
@@ -1045,18 +1120,11 @@ function doPrint(html){
 
 // ===== PWA SERVICE WORKER =====
 if('serviceWorker' in navigator){
-  const sw=`
-const C='pal-v1';
-const F=['./'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(F))));
-self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
-`;
-  const blob=new Blob([sw],{type:'application/javascript'});
-  const url=URL.createObjectURL(blob);
-  navigator.serviceWorker.register(url).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 
 // ===== INIT =====
+loadFontPrefs();
 loadTheme();
 refreshAll();
 </script>
