@@ -1380,7 +1380,7 @@ function applyTxt(){
   if(dest==='lapsos'){
     if(!confirm('¿Reemplazar la lista de estudiantes en todos los lapsos con los '+txtNames.length+' nombres del archivo?'))return;
     const newRows=txtNames.map(n=>({nom:n,ns:new Array(nm).fill(null)}));
-    ['t1','t2','t3','tf'].forEach(k=>{data[k]=newRows.map(r=>({nom:r.nom,ns:[...r.ns];}));});
+    ['t1','t2','t3','tf'].forEach(k=>{data[k]=newRows.map(r=>({nom:r.nom,ns:[...r.ns]}));});
     refreshAll();
   } else {
     if(!confirm('¿Reemplazar la lista en la sección activa de Mi Materia con los '+txtNames.length+' nombres?'))return;
