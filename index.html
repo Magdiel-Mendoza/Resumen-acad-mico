@@ -358,7 +358,7 @@ td.tl{text-align:left}
     <div><div class="hi" id="d-inst">Liceo Dr. J. M. Siso Martínez</div><div class="hs" id="d-lugar">Barquisimeto, Estado Lara</div></div>
     <div class="hdr-r">
       <div class="hbadge" id="d-badge">1ero A · 2025-2026</div>
-      <div class="hbadge" style="background:rgba(255,255,255,.1);font-size:10px;opacity:.8">v10.0</div>
+      <div class="hbadge" style="background:rgba(255,255,255,.1);font-size:10px;opacity:.8">v11.0</div>
       <div style="display:flex;gap:3px;align-items:center">
         <button class="tbtn" onclick="setFS('sm')" title="Fuente pequeña" style="padding:3px 7px">A-</button>
         <button class="tbtn" onclick="setFS('lg')" title="Fuente grande" style="padding:3px 7px">A+</button>
@@ -384,6 +384,8 @@ td.tl{text-align:left}
   <button class="tab" onclick="showTab('tf',this)">Nota Final</button>
   <button class="tab" onclick="showTab('tal',this)">Por Alumno</button>
   <button class="tab" onclick="showTab('tmat',this)" title="Modo para docente que solo dicta una materia">📘 Mi Materia</button>
+  <button class="tab" onclick="showTab('tseg',this)" title="Seguimiento de evaluaciones del lapso">📝 Seguimiento</button>
+  <button class="tab" onclick="showTab('tras',this)" title="Rasgos del estudiante">⭐ Rasgos</button>
 </div>
 <div class="pcard">
   <div id="t1" class="panel act"></div>
@@ -392,6 +394,8 @@ td.tl{text-align:left}
   <div id="tf" class="panel"></div>
   <div id="tal" class="panel"></div>
   <div id="tmat" class="panel"></div>
+  <div id="tseg" class="panel"></div>
+  <div id="tras" class="panel"></div>
 </div>
 
 
@@ -460,7 +464,7 @@ td.tl{text-align:left}
 // ===== DATA =====
 const MDEF=['Castellano','Matemática','Historia de Venezuela','Inglés','Educación Física','Física','Química','Ciencias Biológicas','Dibujo Técnico','Filosofía','Pre-Militar'];
 let mats=[...MDEF];
-const NAMES=['González, Miguel','Rodríguez, Valentina','Pérez, Paola','Martínez, Santiago','García, Adriana','López, Carmen','Ramírez, Miguel','Hernández, Xiomara','Torres, Sofía','Flores, Óscar','Díaz, Gabriela','Morales, Valentina','Jiménez, Carlos','Vargas, Isabella','Castro, Adriana','Rojas, Yohan','Mendoza, Valentina','Suárez, Xiomara','Ortiz, Diego','Medina, Xiomara','Ramos, Carolina','Blanco, Santiago','Álvarez, Alejandra','Gutiérrez, Paola','Reyes, José','Sánchez, Luisa','Salazar, Carolina','Peña, Pedro','Cruz, Paola','Vega, Carmen','González, Diego','Rodríguez, Andrea'];
+const NAMES=['Ontiveros, Crismary','Escobar, Eliana','Bello, María','Vielma, Nicole','Pastrán, Nathalia','Rodríguez, Jeremy','Puerta, Anyerson','Veriles, María','Colmenares, Eduard','Rodríguez, Luis','González, Eydan','Perdomo, Sofía','Pernalete, Valeria','Marín, Analeth','Villegas, Salomón','Timaure, Susej','Cuello, Matías','Timaure, Adriana','Campos, Susej','Pérez, Sebastian','Rodríguez, Carlos','Delgado, Sebastian','Rodríguez, Antonella','Sánchez, Josué','Pérez, Carlos','Arrieche, Isabel','Santoyo, Isamar','Suárez, Crismar','Robertis, Kamila','Manzano, Enmanuel','Frías, Sebastian','Rojas, Wilker'];
 // T1 rows
 
 
@@ -935,6 +939,21 @@ let secciones=[
    rows:NAMES.slice(0,32).map(n=>({nom:n,l1:null,l2:null,l3:null}))}
 ];
 let secActiva=0; // índice de sección activa en Mi Materia
+// ===== SEGUIMIENTO Y RASGOS =====
+// Seguimiento: evaluaciones del lapso para docente no guía
+// Linked to secciones[secActiva] — each section has its own seguimiento
+// seguimiento[secIdx] = { lapso:'1er', evals:[{nom:'Prueba 1'},{...}], rows:[{nom, notas:[v1,v2,...], rasgos:null}] }
+let seguimiento=[
+  {lapso:'1er Lapso', evals:[{nom:'Evaluación 1'},{nom:'Evaluación 2'}],
+   rows:NAMES.map(n=>({nom:n, notas:[null,null], rasgos:null}))}
+];
+let segActivo=0; // índice de grupo de seguimiento activo
+
+// Rasgos: linked to seguimiento[segActivo].rows[i].rasgos
+// Each rasgo has a name and the student gets a value 01-20
+// The docente calculates the value (rule of three for attendance, etc.)
+let rasgosConfig=['Asistencia','Puntualidad','Participación','Cuaderno','Disciplina','Uniforme'];
+
 
 function autoF3(l1,l2,l3){
   const vals=[l1,l2,l3].filter(v=>v!==null&&!isNC(v)&&!isI(v)).map(Number).filter(v=>!isNaN(v));
@@ -1116,6 +1135,428 @@ function printMiMateria(){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════
+// SEGUIMIENTO — evaluaciones continuas del lapso
+// ═══════════════════════════════════════════════════════════════
+function calcSegRow(row, evals){
+  // Average of all notas + rasgos (if set), all on 01-20 scale
+  const vals=[];
+  evals.forEach((_,ei)=>{
+    const v=row.notas[ei];
+    if(v!==null&&v!==undefined){const n=parseFloat(v);if(!isNaN(n))vals.push(n);}
+  });
+  if(row.rasgos!==null&&row.rasgos!==undefined){
+    const n=parseFloat(row.rasgos);if(!isNaN(n))vals.push(n);
+  }
+  if(!vals.length)return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100;
+}
+
+function renderSeguimiento(){
+  const seg=seguimiento[segActivo];
+  const evals=seg.evals;
+  const rows=seg.rows;
+  // Ensure rows have enough notas slots
+  rows.forEach(r=>{while(r.notas.length<evals.length)r.notas.push(null);});
+
+  let tbody='';
+  let sumProm=0,cntProm=0,nAll=0,nApl=0;
+  rows.forEach((r,ri)=>{
+    const prom=calcSegRow(r,evals);
+    if(prom!==null){sumProm+=prom;cntProm++;if(prom>=10)nAll++;else nApl++;}
+    const pc2=prom===null?'':prom>=14?'ph2':prom>=10?'pm2':'pl2';
+    // eval cells
+    let ecells='';
+    evals.forEach((ev,ei)=>{
+      const v=r.notas[ei]!==undefined?r.notas[ei]:null;
+      let disp='<span style="color:var(--brd2)">—</span>';
+      if(v!==null){const n=parseFloat(v);if(!isNaN(n))disp=`<span class="${n>=10?'ok':'bad'}">${dn(n)}</span>`;}
+      ecells+=`<td class="ni-cell" onclick="focusNi(this)">
+        <span class="ni-disp">${disp}</span>
+        <input class="ni ni-hide" value="${v!==null?String(v):''}"
+          onchange="setSegN(${ri},${ei},this.value)" onblur="blurNi(this)"
+          onkeydown="niEnterSeg(event,${ri},'eval',${ei})" inputmode="decimal">
+      </td>`;
+    });
+    // rasgos cell
+    const rv=r.rasgos;
+    let rdisp='<span style="color:var(--brd2)">—</span>';
+    if(rv!==null&&rv!==undefined){const n=parseFloat(rv);if(!isNaN(n))rdisp=`<span class="${n>=10?'ok':'bad'}">${dn(n)}</span>`;}
+    const rcell=`<td class="ni-cell" style="background:var(--Al);border-left:2px solid var(--Am)" onclick="focusNi(this)">
+      <span class="ni-disp">${rdisp}</span>
+      <input class="ni ni-hide" value="${rv!==null&&rv!==undefined?String(rv):''}"
+        onchange="setSegRasgos(${ri},this.value)" onblur="blurNi(this)"
+        onkeydown="niEnterSeg(event,${ri},'rasgos',-1)" inputmode="decimal">
+    </td>`;
+    tbody+=`<tr>
+      <td style="color:var(--tx3);font-size:9.5px">${ri+1}</td>
+      <td class="tl"><input class="ni nin" value="${r.nom==='Apellido, Nombre'?'':r.nom}"
+        placeholder="Apellido, Nombre"
+        onchange="seguimiento[segActivo].rows[${ri}].nom=this.value||'Apellido, Nombre'"
+        onkeydown="niEnterSeg(event,${ri},'name',-1)" inputmode="text"></td>
+      ${ecells}${rcell}
+      <td class="${pc2}" style="font-weight:700;text-align:center">${prom!==null?dn(prom):'—'}</td>
+      <td><button class="dbtn" onclick="delSegRow(${ri})">−</button></td>
+    </tr>`;
+  });
+
+  const avgGrupo=cntProm?sumProm/cntProm:0;
+  const segOpts=seguimiento.map((s,i)=>`<option value="${i}" ${i===segActivo?'selected':''}>${s.lapso} — ${s.rows.length} alumnos</option>`).join('');
+  const evHeaders=evals.map((ev,ei)=>`<th>
+    <input class="ni" style="width:80px;font-size:9px;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3)"
+      value="${ev.nom}" onchange="seguimiento[segActivo].evals[${ei}].nom=this.value;refreshPanel('tseg')" inputmode="text">
+    <button onclick="delEval(${ei})" style="background:none;border:none;color:rgba(255,200,200,.8);cursor:pointer;font-size:12px;margin-left:2px">✕</button>
+  </th>`).join('');
+
+  return`<div style="background:var(--Bl);border-radius:var(--r);padding:9px 13px;margin-bottom:10px;border-left:3px solid var(--Tm)">
+    <b style="color:var(--Bd)">📝 Seguimiento del lapso</b>
+    <span style="font-size:11px;color:var(--tx2)"> — Registra evaluaciones continuas. La nota de Rasgos (fondo amarillo) se calcula en la pestaña ⭐ Rasgos.</span>
+  </div>
+  <div class="tb">
+    <select id="seg-sel" onchange="segActivo=parseInt(this.value);refreshPanel('tseg')"
+      style="font-size:12px;padding:5px 9px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn);max-width:240px">
+      ${segOpts}
+    </select>
+    <button class="btn bt" onclick="nuevoSeguimiento()">+ Grupo</button>
+    <button class="btn br" onclick="eliminarSeguimiento()">✕ Grupo</button>
+    <span class="sp"></span>
+    <button class="btn bt" onclick="addEval()">+ Evaluación</button>
+    <button class="btn bt" onclick="addSegRow()">+ Alumno</button>
+    <button class="btn bg" onclick="printSeguimiento()">🖨 Imprimir</button>
+    <button class="btn bs" onclick="openDat()">💾 Datos</button>
+  </div>
+  <div class="sts">
+    <div class="sc st"><div class="sl">Promedio grupo</div><div class="sv">${avgGrupo.toFixed(2)}</div><div class="ss">${rows.length} estudiantes</div></div>
+    <div class="sc sg"><div class="sl">Aprobados</div><div class="sv">${nAll}</div></div>
+    <div class="sc sa"><div class="sl">Aplazados</div><div class="sv">${nApl}</div></div>
+    <div class="sc sb"><div class="sl">Evaluaciones</div><div class="sv">${evals.length+1}</div><div class="ss">+Rasgos</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap;align-items:flex-end">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em">Lapso</label>
+      <select onchange="seguimiento[segActivo].lapso=this.value;updateSegSel()"
+        style="font-size:12px;padding:5px 9px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx)">
+        <option ${seg.lapso==='1er Lapso'?'selected':''}>1er Lapso</option>
+        <option ${seg.lapso==='2do Lapso'?'selected':''}>2do Lapso</option>
+        <option ${seg.lapso==='3er Lapso'?'selected':''}>3er Lapso</option>
+      </select>
+    </div>
+    <input placeholder="Buscar alumno…" style="flex:1;font-size:12px;padding:5px 10px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn)"
+      oninput="filterSegRows(this.value)" inputmode="text">
+  </div>
+  <div class="tw"><table id="seg-table">
+    <thead><tr>
+      <th>#</th>
+      <th class="tl" style="min-width:140px">Apellidos y nombres</th>
+      ${evHeaders}
+      <th style="background:var(--Am);color:#fff;min-width:60px">⭐ Rasgos</th>
+      <th style="min-width:60px">Nota lapso</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${tbody}</tbody>
+  </table></div>
+  <div class="nb">Nota del lapso = promedio de todas las evaluaciones + Rasgos &nbsp;·&nbsp; Escala 01–20 &nbsp;·&nbsp; Aprobado ≥ 10 &nbsp;·&nbsp; Rasgos se editan en ⭐ Rasgos</div>`;
+}
+
+function updateSegSel(){
+  const sel=document.getElementById('seg-sel');
+  if(!sel)return;
+  sel.innerHTML=seguimiento.map((s,i)=>`<option value="${i}" ${i===segActivo?'selected':''}>${s.lapso} — ${s.rows.length} alumnos</option>`).join('');
+}
+
+function setSegN(ri,ei,val){
+  while(seguimiento[segActivo].rows[ri].notas.length<=ei)seguimiento[segActivo].rows[ri].notas.push(null);
+  seguimiento[segActivo].rows[ri].notas[ei]=normV(val);
+  refreshPanel('tseg');
+}
+function setSegRasgos(ri,val){
+  seguimiento[segActivo].rows[ri].rasgos=normV(val);
+  refreshPanel('tseg');
+  // Also update rasgos panel if active
+  if(activeTab==='tras')refreshPanel('tras');
+}
+function addEval(){
+  const n=seguimiento[segActivo].evals.length+1;
+  seguimiento[segActivo].evals.push({nom:'Evaluación '+n});
+  seguimiento[segActivo].rows.forEach(r=>r.notas.push(null));
+  refreshPanel('tseg');
+}
+function delEval(ei){
+  if(seguimiento[segActivo].evals.length<=1){showToast('Debe haber al menos una evaluación.');return;}
+  seguimiento[segActivo].evals.splice(ei,1);
+  seguimiento[segActivo].rows.forEach(r=>r.notas.splice(ei,1));
+  refreshPanel('tseg');
+}
+function addSegRow(){seguimiento[segActivo].rows.push({nom:'Apellido, Nombre',notas:[],rasgos:null});refreshPanel('tseg');}
+function delSegRow(ri){
+  if(seguimiento[segActivo].rows.length<=1)return;
+  if(!confirm('¿Eliminar a "'+seguimiento[segActivo].rows[ri].nom+'"?'))return;
+  seguimiento[segActivo].rows.splice(ri,1);refreshPanel('tseg');
+}
+function nuevoSeguimiento(){
+  const lapsos=['1er Lapso','2do Lapso','3er Lapso'];
+  const lapso=lapsos[seguimiento.length%3]||'1er Lapso';
+  seguimiento.push({lapso,evals:[{nom:'Evaluación 1'},{nom:'Evaluación 2'}],
+    rows:NAMES.map(n=>({nom:n,notas:[null,null],rasgos:null}))});
+  segActivo=seguimiento.length-1;
+  refreshPanel('tseg');showToast('✓ Nuevo grupo creado');
+}
+function eliminarSeguimiento(){
+  if(seguimiento.length<=1){showToast('Debe existir al menos un grupo.');return;}
+  if(!confirm('¿Eliminar el grupo "'+seguimiento[segActivo].lapso+'"?'))return;
+  seguimiento.splice(segActivo,1);segActivo=Math.max(0,segActivo-1);
+  refreshPanel('tseg');
+}
+function filterSegRows(q){
+  document.querySelectorAll('#seg-table tbody tr').forEach(tr=>{
+    const inp=tr.querySelector('td.tl input');
+    if(!inp){tr.style.display='';return;}
+    tr.style.display=inp.value.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+function niEnterSeg(e,ri,type,col){
+  if(e.key!=='Enter'&&e.key!=='Tab')return;
+  e.preventDefault();
+  const seg=seguimiento[segActivo];
+  const totalRows=seg.rows.length;
+  const totalEvals=seg.evals.length;
+  if(type==='eval'&&e.key==='Enter'){const curVal=e.target.value.trim();setSegN(ri,col,curVal);}
+  if(type==='rasgos'&&e.key==='Enter'){const curVal=e.target.value.trim();setSegRasgos(ri,curVal);}
+  function fNote(rowIdx,colIdx){
+    setTimeout(()=>{
+      const tbl=document.getElementById('seg-table');if(!tbl)return;
+      const rows=tbl.querySelectorAll('tbody tr');
+      if(rows[rowIdx]){const cells=rows[rowIdx].querySelectorAll('.ni-cell');if(cells[colIdx])focusNi(cells[colIdx]);}
+    },40);
+  }
+  function fName(rowIdx){
+    setTimeout(()=>{
+      const tbl=document.getElementById('seg-table');if(!tbl)return;
+      const rows=tbl.querySelectorAll('tbody tr');
+      if(rows[rowIdx]){const inp=rows[rowIdx].querySelector('.nin');if(inp){inp.focus();inp.select();}}
+    },40);
+  }
+  if(type==='name'){if(e.key==='Enter')fName(ri+1<totalRows?ri+1:ri);else fNote(ri,0);}
+  else if(type==='eval'){
+    if(e.key==='Enter'){if(ri+1<totalRows)fNote(ri+1,col);else fNote(0,col);}
+    else{if(col+1<totalEvals)fNote(ri,col+1);else fNote(ri,totalEvals);} // totalEvals = rasgos col
+  }
+  else if(type==='rasgos'){
+    if(e.key==='Enter'){if(ri+1<totalRows)fNote(ri+1,totalEvals);else fNote(0,totalEvals);}
+    else{fName(ri+1<totalRows?ri+1:0);}
+  }
+}
+
+function printSeguimiento(){
+  const i=inf(),seg=seguimiento[segActivo],rows=seg.rows,evals=seg.evals;
+  let tbody='',nAll=0,nApl=0,sumP=0,cntP=0;
+  rows.forEach((r,ri)=>{
+    const prom=calcSegRow(r,evals);
+    if(prom!==null){sumP+=prom;cntP++;if(prom>=10)nAll++;else nApl++;}
+    const dc=v=>{if(v===null||v===undefined)return'—';const n=parseFloat(v);return isNaN(n)?String(v):dn(n);};
+    const fc=v=>{if(v===null||v===undefined)return'';const n=parseFloat(v);return isNaN(n)||n>=10?'bok':'bbd';};
+    let ecells=evals.map((_,ei)=>`<td class="${fc(r.notas[ei])}">${dc(r.notas[ei])}</td>`).join('');
+    tbody+=`<tr><td class="tl">${ri+1}. ${r.nom}</td>${ecells}
+      <td style="background:#f5f0e0;font-weight:600">${dc(r.rasgos)}</td>
+      <td class="${fc(prom)}" style="font-weight:700">${prom!==null?dn(prom):'—'}</td></tr>`;
+  });
+  const avg=cntP?sumP/cntP:0;
+  const evTh=evals.map(ev=>`<th>${ev.nom}</th>`).join('');
+  doPrint(`<div class="pdoc bp">
+    ${venHdr('Seguimiento del Lapso — '+seg.lapso)}
+    <div class="sec-meta">
+      <span>Lapso: <b>${seg.lapso}</b></span>
+      <span>Docente: <b>${i.doc}</b></span>
+      <span>Período: <b>${i.periodo}</b></span>
+      <span>Alumnos: <b>${rows.length}</b></span>
+      <span>Evaluaciones: <b>${evals.length}+Rasgos</b></span>
+      <span>Promedio grupo: <b>${avg.toFixed(2)}</b></span>
+      <span>Aprobados: <b>${nAll}</b></span><span>Aplazados: <b>${nApl}</b></span>
+    </div>
+    <table class="sec-tbl">
+      <thead><tr>
+        <th class="tl" style="min-width:120px">Apellidos y nombres</th>
+        ${evTh}<th>⭐ Rasgos</th><th>Nota lapso</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+    <div class="sec-foot">
+      <span>Nota lapso = promedio de evaluaciones + Rasgos</span>
+      <span>Notas &lt;10 subrayadas</span><span>Escala 01–20</span><span>Aprobado ≥10</span>
+    </div>
+    <div class="sec-fir"><div>Docente: ${i.doc}</div><div>Director(a)</div><div>Fecha: ___________</div></div>
+  </div>`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RASGOS — evaluación actitudinal y de convivencia
+// ═══════════════════════════════════════════════════════════════
+function calcRasgoRow(valores){
+  const nums=valores.filter(v=>v!==null&&v!==undefined).map(Number).filter(v=>!isNaN(v));
+  if(!nums.length)return null;
+  return Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*100)/100;
+}
+
+function renderRasgos(){
+  // Rasgos uses seguimiento[segActivo].rows for student list
+  // Each row has rasgos_detalle: array of values per rasgo
+  const seg=seguimiento[segActivo];
+  const rows=seg.rows;
+  // Ensure rows have rasgos_detalle
+  rows.forEach(r=>{
+    if(!r.rasgos_det)r.rasgos_det=new Array(rasgosConfig.length).fill(null);
+    while(r.rasgos_det.length<rasgosConfig.length)r.rasgos_det.push(null);
+  });
+
+  let tbody='',sumP=0,cntP=0;
+  rows.forEach((r,ri)=>{
+    const prom=calcRasgoRow(r.rasgos_det);
+    if(prom!==null){sumP+=prom;cntP++;}
+    const pc2=prom===null?'':prom>=14?'ph2':prom>=10?'pm2':'pl2';
+    let rcells='';
+    rasgosConfig.forEach((rasgo,rgi)=>{
+      const v=r.rasgos_det[rgi];
+      let disp='<span style="color:var(--brd2)">—</span>';
+      if(v!==null&&v!==undefined){const n=parseFloat(v);if(!isNaN(n))disp=`<span class="${n>=10?'ok':'bad'}">${dn(n)}</span>`;}
+      rcells+=`<td class="ni-cell" onclick="focusNi(this)">
+        <span class="ni-disp">${disp}</span>
+        <input class="ni ni-hide" value="${v!==null&&v!==undefined?String(v):''}"
+          onchange="setRasgoN(${ri},${rgi},this.value)" onblur="blurNi(this)"
+          onkeydown="niEnterRas(event,${ri},${rgi})" inputmode="decimal">
+      </td>`;
+    });
+    tbody+=`<tr>
+      <td style="color:var(--tx3);font-size:9.5px">${ri+1}</td>
+      <td class="tl" style="font-size:11px;font-weight:500;white-space:nowrap">${r.nom}</td>
+      ${rcells}
+      <td class="${pc2}" style="font-weight:700;text-align:center">${prom!==null?dn(prom):'—'}</td>
+    </tr>`;
+    // Propagate nota rasgos back to seguimiento row
+    if(prom!==null)r.rasgos=Math.round(prom);
+    else r.rasgos=null;
+  });
+
+  const avg=cntP?sumP/cntP:0;
+  const rasgoHeaders=rasgosConfig.map((r,ri)=>`<th style="max-width:60px">
+    <input class="ni" style="width:70px;font-size:8px;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);text-align:center"
+      value="${r}" onchange="rasgosConfig[${ri}]=this.value;refreshPanel('tras')" inputmode="text">
+    <button onclick="delRasgo(${ri})" style="background:none;border:none;color:rgba(255,200,200,.8);cursor:pointer;font-size:11px">✕</button>
+  </th>`).join('');
+
+  const segOpts=seguimiento.map((s,i)=>`<option value="${i}" ${i===segActivo?'selected':''}>${s.lapso} — ${s.rows.length} alumnos</option>`).join('');
+
+  return`<div style="background:var(--Al);border-radius:var(--r);padding:9px 13px;margin-bottom:10px;border-left:3px solid var(--Am)">
+    <b style="color:var(--A)">⭐ Rasgos</b>
+    <span style="font-size:11px;color:var(--tx2)"> — Evalúa cada rasgo en escala 01–20. El promedio se transfiere automáticamente a la columna Rasgos en 📝 Seguimiento.</span>
+  </div>
+  <div class="tb">
+    <select id="ras-sel" onchange="segActivo=parseInt(this.value);refreshPanel('tras');refreshPanel('tseg')"
+      style="font-size:12px;padding:5px 9px;border:1.5px solid var(--brd2);border-radius:var(--r);background:var(--inp);color:var(--tx);font-family:var(--fn);max-width:240px">
+      ${segOpts}
+    </select>
+    <span class="sp"></span>
+    <button class="btn bs" onclick="addRasgo()">+ Rasgo</button>
+    <button class="btn bg" onclick="printRasgos()">🖨 Imprimir</button>
+    <button class="btn bs" onclick="openDat()">💾 Datos</button>
+  </div>
+  <div class="sts">
+    <div class="sc sa"><div class="sl">Promedio rasgos</div><div class="sv">${avg.toFixed(2)}</div><div class="ss">${rows.length} estudiantes</div></div>
+    <div class="sc sb"><div class="sl">Rasgos configurados</div><div class="sv">${rasgosConfig.length}</div><div class="ss">clic nombre para editar</div></div>
+  </div>
+  <div class="nb" style="margin-bottom:9px">
+    💡 Cada rasgo se califica en escala <b>01–20</b>. Puedes usar regla de tres para asistencia: si son 7 sesiones y el alumno asistió 5 → nota = (5×20)÷7 = 14.
+    El promedio de todos los rasgos se transfiere automáticamente a la columna ⭐ Rasgos en Seguimiento.
+  </div>
+  <div class="tw"><table id="ras-table">
+    <thead><tr>
+      <th>#</th><th class="tl" style="min-width:140px">Apellidos y nombres</th>
+      ${rasgoHeaders}
+      <th style="min-width:60px">Nota rasgos</th>
+    </tr></thead>
+    <tbody>${tbody}</tbody>
+  </table></div>
+  <div class="nb">Nota rasgos = promedio de todos los rasgos &nbsp;·&nbsp; Se actualiza automáticamente en Seguimiento &nbsp;·&nbsp; Escala 01–20</div>`;
+}
+
+function setRasgoN(ri,rgi,val){
+  if(!seguimiento[segActivo].rows[ri].rasgos_det)
+    seguimiento[segActivo].rows[ri].rasgos_det=new Array(rasgosConfig.length).fill(null);
+  seguimiento[segActivo].rows[ri].rasgos_det[rgi]=normV(val);
+  // Recalculate rasgos note
+  const det=seguimiento[segActivo].rows[ri].rasgos_det;
+  const nums=det.filter(v=>v!==null).map(Number).filter(v=>!isNaN(v));
+  seguimiento[segActivo].rows[ri].rasgos=nums.length?Math.round(nums.reduce((a,b)=>a+b,0)/nums.length):null;
+  refreshPanel('tras');
+  if(activeTab==='tseg')refreshPanel('tseg');
+}
+function addRasgo(){
+  rasgosConfig.push('Nuevo rasgo');
+  seguimiento.forEach(seg=>seg.rows.forEach(r=>{if(!r.rasgos_det)r.rasgos_det=[];r.rasgos_det.push(null);}));
+  refreshPanel('tras');
+}
+function delRasgo(ri){
+  if(rasgosConfig.length<=1){showToast('Debe haber al menos un rasgo.');return;}
+  rasgosConfig.splice(ri,1);
+  seguimiento.forEach(seg=>seg.rows.forEach(r=>{if(r.rasgos_det)r.rasgos_det.splice(ri,1);}));
+  refreshPanel('tras');
+}
+function niEnterRas(e,ri,rgi){
+  if(e.key!=='Enter'&&e.key!=='Tab')return;
+  e.preventDefault();
+  const curVal=e.target.value.trim();
+  setRasgoN(ri,rgi,curVal);
+  const totalRows=seguimiento[segActivo].rows.length;
+  const totalRasgos=rasgosConfig.length;
+  function fCell(rowIdx,colIdx){
+    setTimeout(()=>{
+      const tbl=document.getElementById('ras-table');if(!tbl)return;
+      const rows=tbl.querySelectorAll('tbody tr');
+      if(rows[rowIdx]){const cells=rows[rowIdx].querySelectorAll('.ni-cell');if(cells[colIdx])focusNi(cells[colIdx]);}
+    },40);
+  }
+  if(e.key==='Enter'){if(ri+1<totalRows)fCell(ri+1,rgi);else fCell(0,rgi);}
+  else{if(rgi+1<totalRasgos)fCell(ri,rgi+1);else fCell(ri+1<totalRows?ri+1:0,0);}
+}
+
+function printRasgos(){
+  const i=inf(),seg=seguimiento[segActivo],rows=seg.rows;
+  let tbody='',sumP=0,cntP=0;
+  rows.forEach((r,ri)=>{
+    const det=r.rasgos_det||[];
+    const prom=calcRasgoRow(det);
+    if(prom!==null){sumP+=prom;cntP++;}
+    const dc=v=>{if(v===null||v===undefined)return'—';const n=parseFloat(v);return isNaN(n)?String(v):dn(n);};
+    const fc=v=>{if(v===null||v===undefined)return'';const n=parseFloat(v);return isNaN(n)||n>=10?'bok':'bbd';};
+    let rcells=rasgosConfig.map((_,rgi)=>`<td class="${fc(det[rgi])}">${dc(det[rgi])}</td>`).join('');
+    tbody+=`<tr><td class="tl">${ri+1}. ${r.nom}</td>${rcells}
+      <td class="${fc(prom)}" style="font-weight:700">${prom!==null?dn(prom):'—'}</td></tr>`;
+  });
+  const avg=cntP?sumP/cntP:0;
+  const rasTh=rasgosConfig.map(r=>`<th>${r}</th>`).join('');
+  doPrint(`<div class="pdoc bp">
+    ${venHdr('Evaluación de Rasgos — '+seg.lapso)}
+    <div class="sec-meta">
+      <span>Lapso: <b>${seg.lapso}</b></span>
+      <span>Docente: <b>${i.doc}</b></span>
+      <span>Período: <b>${i.periodo}</b></span>
+      <span>Alumnos: <b>${rows.length}</b></span>
+      <span>Promedio grupo: <b>${avg.toFixed(2)}</b></span>
+    </div>
+    <table class="sec-tbl">
+      <thead><tr>
+        <th class="tl" style="min-width:120px">Apellidos y nombres</th>
+        ${rasTh}<th>Nota rasgos</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+    <div class="sec-foot">
+      <span>Nota rasgos = promedio de todos los rasgos</span>
+      <span>Notas &lt;10 subrayadas</span><span>Escala 01–20</span><span>Aprobado ≥10</span>
+    </div>
+    <div class="sec-fir"><div>Docente: ${i.doc}</div><div>Director(a)</div><div>Fecha: ___________</div></div>
+  </div>`);
+}
 // ===== TAB / REFRESH =====
 function showTab(id,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('act'));
@@ -1125,11 +1566,15 @@ function showTab(id,el){
   activeTab=id;
   if(id==='tal'){document.getElementById('tal').innerHTML=renderAlumno();setTimeout(()=>renderAlDetail(0),50);}
   if(id==='tmat'){document.getElementById('tmat').innerHTML=renderMiMateria();}
+  if(id==='tseg'){document.getElementById('tseg').innerHTML=renderSeguimiento();}
+  if(id==='tras'){document.getElementById('tras').innerHTML=renderRasgos();}
 }
 function refreshPanel(key){
   if(key==='tal'){if(activeTab==='tal'){document.getElementById('tal').innerHTML=renderAlumno();setTimeout(()=>{const s=document.getElementById('al-sel');if(s)renderAlDetail(s.value);},50);}return;}
   if(key==='tf'){document.getElementById('tf').innerHTML=renderFinal();return;}
   if(key==='tmat'){if(activeTab==='tmat')document.getElementById('tmat').innerHTML=renderMiMateria();return;}
+  if(key==='tseg'){if(activeTab==='tseg')document.getElementById('tseg').innerHTML=renderSeguimiento();return;}
+  if(key==='tras'){if(activeTab==='tras')document.getElementById('tras').innerHTML=renderRasgos();return;}
   document.getElementById(key).innerHTML=renderLapso(key);
 }
 function refreshAll(){
@@ -1137,6 +1582,8 @@ function refreshAll(){
   document.getElementById('tf').innerHTML=renderFinal();
   if(activeTab==='tal'){document.getElementById('tal').innerHTML=renderAlumno();setTimeout(()=>renderAlDetail(0),50);}
   if(activeTab==='tmat'){document.getElementById('tmat').innerHTML=renderMiMateria();}
+  if(activeTab==='tseg'){document.getElementById('tseg').innerHTML=renderSeguimiento();}
+  if(activeTab==='tras'){document.getElementById('tras').innerHTML=renderRasgos();}
 }
 
 // ===== MATS MODAL =====
@@ -1159,11 +1606,13 @@ function openDat(){
 function closeDat(){document.getElementById('dat-ov').classList.remove('open');}
 document.getElementById('dat-ov').addEventListener('click',e=>{if(e.target===document.getElementById('dat-ov'))closeDat();});
 
-function getState(){return{mats:[...mats],data:JSON.parse(JSON.stringify(data)),secciones:JSON.parse(JSON.stringify(secciones)),meta:inf()};}
+function getState(){return{mats:[...mats],data:JSON.parse(JSON.stringify(data)),secciones:JSON.parse(JSON.stringify(secciones)),seguimiento:JSON.parse(JSON.stringify(seguimiento)),rasgosConfig:[...rasgosConfig],meta:inf()};}
 function applyState(st){
   if(st.mats){mats.splice(0,mats.length,...st.mats);}
   if(st.data){Object.keys(st.data).forEach(k=>{data[k]=st.data[k];});}
   if(st.secciones&&Array.isArray(st.secciones)&&st.secciones.length){secciones.splice(0,secciones.length,...st.secciones);secActiva=0;}
+  if(st.seguimiento&&Array.isArray(st.seguimiento)&&st.seguimiento.length){seguimiento.splice(0,seguimiento.length,...st.seguimiento);segActivo=0;}
+  if(st.rasgosConfig&&Array.isArray(st.rasgosConfig)&&st.rasgosConfig.length){rasgosConfig.splice(0,rasgosConfig.length,...st.rasgosConfig);}
   if(st.meta){
     ['inst','lugar','doc','sec'].forEach(f=>{const el=document.getElementById('f-'+f);if(el&&st.meta[f])el.value=st.meta[f];});
     const ep=document.getElementById('f-per');if(ep&&st.meta.periodo)ep.value=st.meta.periodo;
